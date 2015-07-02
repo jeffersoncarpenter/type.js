@@ -1,41 +1,38 @@
-var type = function (t, obj) {
-	if (type.DEACTIVATE) {
-		return obj;
-	}
-	else {
-		return t.check(obj, function (o) {
-			var oName = '';
-			if ($.type(o) === 'function') {
-				oName = 'function';
-			}
-			else {
-				oName = JSON.stringify(o);
-			}
-			message = 'type error: ' + oName + ' is not a ' + t.name;
-			console.warn(message);
-		});
-	}
-};
-
-var id = function (obj) {
-	return obj;
-};
-
+var is = require('is');
 
 var Type = {
 	name: 'Type',
 	check: function (obj, typeError) {
-		if ($.type(obj) !== 'object') {
+		if (!is.object(obj)) {
 			typeError(obj);
 		}
-		if ($.type(obj.check) !== 'function') {
+		if (!is.fn(obj.check)) {
 			typeError(obj);
 		}
-		if ($.type(obj.name) !== 'string') {
+		if (!is.string(obj.name)) {
 			typeError(obj);
 		}
 	},
-}
+};
+
+
+var checkTypesWith = function (f) {
+	return function (t, obj) {
+		return t.check(obj, function () {
+			return f(t, obj);
+		});
+	};
+};
+
+var type = checkTypesWith(function (t, o) {
+	var oName = is.fn(o) ? 'function' : JSON.stringify(o);
+	message = 'type error: ' + oName + ' is not a ' + t.name;
+	console.warn(message);
+});
+
+var id = function (obj) {
+	return obj;
+};
 
 
 // everything is a Bottom
@@ -50,7 +47,7 @@ var Bottom = {
 var String = {
 	name: 'String',
 	check: function (obj, typeError) {
-		if ($.type(obj) !== 'string') {
+		if (!is.string(obj)) {
 			typeError(obj);
 		}
 		return obj;
@@ -61,7 +58,7 @@ var String = {
 var Number = {
 	name: 'Number',
 	check: function (obj, typeError) {
-		if ($.type(obj) !== 'number') {
+		if (!is.number(obj)) {
 			typeError(obj);
 		}
 		return obj;
@@ -72,7 +69,7 @@ var Number = {
 var Boolean = {
 	name: 'Boolean',
 	check: function (obj, typeError) {
-		if ($.type(obj) !== 'boolean') {
+		if (!is.bool(obj)) {
 			typeError(obj);
 		}
 		return obj;
@@ -108,7 +105,7 @@ var array = function (ty) {
 		check: function (obj, typeError) {
 			var name = 'array(' + (ty ? ty.name : '') + ')';
 			
-			if ($.type(obj) !== 'array') {
+			if (!is.object(obj)) {
 				typeError(obj);
 				return obj;
 			}
@@ -174,7 +171,7 @@ var object = function (desc) {
 	return {
 		name: name,
 		check: function (obj, typeError) {
-			if ($.type(obj) !== 'object') {
+			if (!is.object(obj)) {
 				typeError(obj);
 			}
 			for (var key in desc) {
@@ -246,11 +243,10 @@ var instance = function (klass, name) {
 		},
 	};
 };
-var JQuery = instance(jQuery, 'JQuery');
 
 
 var func = function (types, outputType) {
-	if (types && $.type(types) !== 'array') {
+	if (types && !is.array(types)) {
 		types = [types];
 	}
 	return {
@@ -258,12 +254,12 @@ var func = function (types, outputType) {
 		check: function (obj, typeError, executionData) {
 			executionData = executionData || {};
 			
-			if ($.type(obj) !== 'function') {
+			if (!is.fn(obj)) {
 				typeError();
 			}
 			var checkResult = function (args, result) {
 				if (outputType) {
-					if ($.type(outputType) === 'function') {
+					if (is.fn(outputType)) {
 						return outputType.apply(window, args).check(result, function (a, resultResult) {
 							return typeError(obj, {
 								args: args,
@@ -299,7 +295,7 @@ var func = function (types, outputType) {
 				if (executionData.result) {
 					return checkResult(args, executionData.result);
 				}
-				var result = obj.apply(window, args);
+				var result = obj.apply(null, args);
 				return checkResult(args, result);
 			};
 
@@ -416,3 +412,39 @@ var monad = typeclass(function (m) {
 	};
 });
 // monad.instance([
+
+var exports = {
+	Type: Type,
+	checkTypesWith: checkTypesWith,
+	type: type,
+	
+	Bottom: Bottom,
+	String: String,
+	Number: Number,
+	Boolean: Boolean,
+	or: or,
+	array: array,
+	promise: promise,
+	stream: stream,
+	object: object,
+	enumeration: enumeration,
+	oneOf: oneOf,
+	cases: cases,
+	instance: instance,
+	func: func,
+
+	poly: poly,
+};
+
+var exportTo = function (obj) {
+	for (var key in exports) {
+		obj[key] = exports[key];
+	}
+};
+
+if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {
+	exportTo(global);
+}
+else {
+	exportTo(window);
+}
